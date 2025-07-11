@@ -1,93 +1,145 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Button, Input } from 'react-native-elements';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import {
+  TextInput,
+  Button,
+  Text,
+  useTheme,
+  Title,
+} from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
-import { IP } from '../Components/IP'; // Asegúrate que esta exporta correctamente la IP
+import { IP } from '../Components/IP';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Login = () => {
-  const [user, setUser] = useState('');
-  const [password, setPassword] = useState('');
-  const [userData, setUserData] = useState(null);
+  const [user, setUser] = useState('cesar.carrillo1@email.com');
+  const [password, setPassword] = useState('12345678');
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
+  const theme = useTheme();
 
   const validar = async () => {
+    setSubmitted(true);
+
     if (user.trim() === '' || password.trim() === '') {
-      Alert.alert('Error', 'Todos los campos son obligatorios');
+      Alert.alert('❌ Error', 'Todos los campos son obligatorios');
       return;
     }
 
     try {
+      setLoading(true);
+
       const response = await axios.post(`${IP}/api/users/login`, {
         correo: user,
-        password: password
+        password,
       });
 
-      setUserData(response.data.usuario); // Ajusta según la estructura del backend
-      Alert.alert('Éxito', 'Usuario autenticado correctamente');
-      console.log('Datos del usuario:', response.data);
+      const usuario = response.data.usuario[0];
+      await AsyncStorage.setItem('usuario', JSON.stringify(usuario));
 
-      // Opcional: navega a otra pantalla si es exitoso
-      // navigation.navigate('Home');
-
+      Alert.alert('✅ Éxito', 'Usuario autenticado correctamente');
+      navigation.navigate('home');
     } catch (error) {
-      if (error.response) {
-    // El servidor respondió con un código de error (4xx o 5xx)
-    console.log('🔴 Error de respuesta del servidor:', error.response.data);
-    console.log('📄 Status:', error.response.status);
-    Alert.alert('Error del servidor', `Código: ${error.response.status}`);
-  } else if (error.request) {
-    // La solicitud fue hecha pero no hubo respuesta (servidor no responde)
-    console.log('🟡 El servidor no respondió. Request:', error.request);
-    Alert.alert('Error de red', 'El servidor no responde');
-  } else {
-    // Error desconocido (por ejemplo configuración)
-    console.log('⚠️ Error desconocido:', error.message);
-    Alert.alert('Error desconocido', error.message);
-  }
-
-  // Imprimir todo el error por si acaso
-  console.error('Detalle completo del error:', error);
+      console.error('Error al iniciar sesión:', error);
+      Alert.alert('❌ Error', 'Credenciales incorrectas o error de conexión');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Iniciar sesión</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <Title style={styles.title}>Iniciar sesión</Title>
 
-      <Input
-        label="Correo electrónico"
-        placeholder="Ingrese su correo"
-        value={user}
-        onChangeText={setUser}
-        errorMessage={user.trim() === '' ? 'El campo es obligatorio' : ''}
-      />
+        <TextInput
+          label="Correo electrónico"
+          value={user}
+          onChangeText={(text) => {
+            setUser(text);
+            if (submitted) setSubmitted(false);
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          error={submitted && user.trim() === ''}
+          style={styles.input}
+        />
+        {submitted && user.trim() === '' && (
+          <Text style={styles.error}>El correo es obligatorio</Text>
+        )}
 
-      <Input
-        label="Contraseña"
-        placeholder="Ingrese su contraseña"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        errorMessage={password.trim() === '' ? 'El campo es obligatorio' : ''}
-      />
+        <TextInput
+          label="Contraseña"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            if (submitted) setSubmitted(false);
+          }}
+          secureTextEntry
+          error={submitted && password.trim() === ''}
+          style={styles.input}
+        />
+        {submitted && password.trim() === '' && (
+          <Text style={styles.error}>La contraseña es obligatoria</Text>
+        )}
 
-      <Button title="Ingresar" onPress={validar} />
-    </ScrollView>
+        <Button
+          mode="contained"
+          onPress={validar}
+          loading={loading}
+          disabled={loading}
+          style={styles.button}
+        >
+          Ingresar
+        </Button>
+
+        <Button
+          mode="text"
+          onPress={() => navigation.navigate('registro')}
+          style={{ marginTop: 16 }}
+        >
+          ¿No tienes cuenta? Crear una
+        </Button>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    padding: 24,
     flexGrow: 1,
-    padding: 20,
     justifyContent: 'center',
   },
   title: {
     textAlign: 'center',
     fontSize: 24,
-    marginBottom: 30,
+    marginBottom: 24,
     fontWeight: 'bold',
+  },
+  input: {
+    marginBottom: 12,
+  },
+  button: {
+    marginTop: 12,
+  },
+  error: {
+    color: '#d32f2f',
+    marginBottom: 8,
+    marginLeft: 4,
+    fontSize: 13,
   },
 });
 
